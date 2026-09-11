@@ -128,7 +128,10 @@ needed.
   Blockchain.com fails) is implemented but not live-validated — see
   `Blockchain/README.md`. Doesn't affect the API contract or frontend at
   all; it's an internal resilience detail.
-- Elliptic dataset backing the scoring heuristic is a synthetic
-  schema-compatible sample by default (real dataset requires a Kaggle
-  license) — doesn't change the API shape, just the specific confidence
-  numbers you'll see until the real dataset is dropped in.
+- The real Elliptic dataset is now in use for the scoring heuristic (not
+  the synthetic sample) in this environment. It's licensed/non-redistributable
+  and gitignored (`Blockchain/data/elliptic/`), so anyone else running this
+  locally needs their own copy from Kaggle — see `Blockchain/README.md` —
+  or the synthetic fallback (`gen_elliptic_sample.py`) is used automatically
+  if it's missing. Doesn't change the API shape either way, just the
+  specific confidence numbers returned.
