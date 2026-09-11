@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+.pytest_cache/
+Blockchain/data/cache/
+Blockchain/data/elliptic/
+.venv/
+venv/
