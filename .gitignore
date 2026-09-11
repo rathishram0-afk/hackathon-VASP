@@ -5,3 +5,8 @@ Blockchain/data/cache/
 Blockchain/data/elliptic/
 .venv/
 venv/
+.env
+.env.local
+frontend.zip
+.claude/settings.local.json
+.claude/skills/

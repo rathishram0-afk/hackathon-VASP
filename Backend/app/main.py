@@ -8,11 +8,13 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
+from Backend.app.investigations import router as investigations_router
 from Backend.app.traversal import DEFAULT_MAX_HOPS, DEFAULT_MAX_NODES
 from Blockchain.client.onchain import OnChainClientError
 from Integeration.pipeline import run_trace
 
 app = FastAPI(title="VASP Trace", version="0.1.0")
+app.include_router(investigations_router)
 
 # Wide open for the hackathon demo -- the frontend (built separately) may be
 # served from any local port during judging.
