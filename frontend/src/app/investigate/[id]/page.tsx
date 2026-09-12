@@ -12,6 +12,7 @@ import { VASPAttributionCard } from '@/components/investigation/VASPAttributionC
 import { EvidenceTimeline } from '@/components/investigation/EvidenceTimeline';
 import { MixerDetectionPanel } from '@/components/investigation/MixerDetectionPanel';
 import { ReportExportModal } from '@/components/investigation/ReportExportModal';
+import { InvestigatorCopilot } from '@/components/copilot/InvestigatorCopilot';
 
 import {
   ShieldAlert,
@@ -26,6 +27,7 @@ import {
   Activity,
   CheckCircle,
   AlertTriangle,
+  Sparkles,
 } from 'lucide-react';
 
 export default function InvestigationWorkspacePage() {
@@ -37,7 +39,9 @@ export default function InvestigationWorkspacePage() {
   const [selectedHops, setSelectedHops] = useState<number>(4);
   const [selectedNode, setSelectedNode] = useState<GraphNode | null>(null);
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
+  const [isCopilotOpen, setIsCopilotOpen] = useState(false);
   const [copiedAddress, setCopiedAddress] = useState(false);
+
 
   const [activeFilters, setActiveFilters] = useState<Record<NodeType, boolean>>({
     scam_source: true,
@@ -96,8 +100,16 @@ export default function InvestigationWorkspacePage() {
               </span>
             </div>
 
-            {/* Action CTA: Generate Law Enforcement Freeze Request */}
+            {/* Action CTA: Investigator Copilot & Prepare Freeze Request */}
             <div className="flex items-center space-x-2">
+              <button
+                onClick={() => setIsCopilotOpen(true)}
+                className="px-4 py-2 bg-gradient-to-r from-cyan-600 to-emerald-600 hover:from-cyan-500 hover:to-emerald-500 text-white text-xs font-semibold rounded-md shadow-md shadow-cyan-500/20 flex items-center space-x-1.5 transition font-sans cursor-pointer"
+              >
+                <Sparkles className="w-4 h-4 text-emerald-200 animate-pulse" />
+                <span>Investigator Copilot</span>
+              </button>
+
               <button
                 onClick={() => setIsReportModalOpen(true)}
                 className="px-4 py-2 bg-[#0C6CF2] hover:bg-blue-600 active:scale-[0.98] text-white text-xs font-semibold rounded-md shadow-md shadow-blue-500/10 flex items-center space-x-1.5 transition font-sans"
@@ -106,6 +118,7 @@ export default function InvestigationWorkspacePage() {
                 <span>Prepare Freeze Request / Report</span>
               </button>
             </div>
+
           </div>
 
           {/* Key Intelligence Summary Strip */}
@@ -246,7 +259,49 @@ export default function InvestigationWorkspacePage() {
           isOpen={isReportModalOpen}
           onClose={() => setIsReportModalOpen(false)}
         />
+
+        {/* AI Forensic Investigator Copilot */}
+        <InvestigatorCopilot
+          isOpen={isCopilotOpen}
+          onClose={() => setIsCopilotOpen(false)}
+          investigationId={caseData.id || caseId}
+          traceContext={{
+            source: caseData.sourceWallet,
+            truncated: false,
+            graph: {
+              nodes: (caseData.graphData?.nodes || []).map((n) => ({
+                address: n.id,
+                hop_distance: n.hop || 0,
+                tag: n.entityName ? { exchange: n.entityName, label: n.label || '' } : null,
+              })),
+              edges: (caseData.graphData?.edges || []).map((e) => ({
+                src: typeof e.source === 'object' ? (e.source as any).id : e.source,
+                dst: typeof e.target === 'object' ? (e.target as any).id : e.target,
+                tx_hash: e.txHash || null,
+                value_btc: e.amountBtc || null,
+                timestamp: e.timestamp ? Math.floor(new Date(e.timestamp).getTime() / 1000) : null,
+              })),
+            },
+            candidates: (caseData.attributions || []).map((a) => ({
+              exchange: a.vaspName,
+              address: a.destinationWallet,
+              confidence: a.confidenceScore > 1 ? a.confidenceScore / 100 : a.confidenceScore,
+              hop_distance: a.hopProximity,
+              path: [caseData.sourceWallet, a.destinationWallet],
+              kind: 'heuristic',
+              mixer_obscured: false,
+            })),
+          }}
+
+          onSelectNode={(addr) => {
+            const found = caseData.graphData?.nodes?.find((n) => n.id === addr || n.label === addr);
+            if (found) {
+              setSelectedNode(found);
+            }
+          }}
+        />
       </div>
     </AppShell>
+
   );
 }

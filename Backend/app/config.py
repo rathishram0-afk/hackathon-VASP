@@ -6,11 +6,17 @@ existing trace pipeline, which has no environment dependency.
 """
 from __future__ import annotations
 
+from pathlib import Path
 import os
 
 from dotenv import load_dotenv
 
-load_dotenv()
+_BACKEND_DIR = Path(__file__).resolve().parent.parent
+_ENV_PATH = _BACKEND_DIR / ".env"
+if _ENV_PATH.is_file():
+    load_dotenv(dotenv_path=_ENV_PATH)
+else:
+    load_dotenv()
 
 SUPABASE_URL = os.environ.get("SUPABASE_URL", "")
 SUPABASE_SECRET_KEY = os.environ.get("SUPABASE_SECRET_KEY", "")

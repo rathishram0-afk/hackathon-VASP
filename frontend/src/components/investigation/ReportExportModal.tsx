@@ -3,6 +3,9 @@
 import React, { useState } from 'react';
 import { X, Download, FileText, Copy, Shield, Check, Printer } from 'lucide-react';
 import { Investigation } from '@/types/forensics';
+import { downloadForensicReportPDF } from '@/lib/pdfExport';
+import { normalizeReportData } from '@/lib/reportData';
+import { ForensicReport } from '@/components/report/ForensicReport';
 
 interface ReportExportModalProps {
   investigation: Investigation;
@@ -30,6 +33,11 @@ Timestamp: ${new Date().toUTCString()}`;
     navigator.clipboard.writeText(text);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleDownloadPDF = () => {
+    const data = normalizeReportData({ investigation });
+    downloadForensicReportPDF(data);
   };
 
   const handlePrintPDF = () => {
@@ -66,90 +74,12 @@ Timestamp: ${new Date().toUTCString()}`;
         </div>
 
         {/* Report Document Content Body - Printable Format */}
-        <div className="p-6 overflow-y-auto space-y-6 text-xs bg-[#07090E] text-[#E2E8F0] border-b border-[#1E293B]">
-          {/* Header Identity Block */}
-          <div className="flex items-start justify-between border-b border-[#1E293B] pb-4">
-            <div>
-              <div className="text-xl font-bold text-white font-sans tracking-tight">
-                VASP<span className="text-[#0C6CF2]">TRACE</span> FORENSICS DISCLOSURE
-              </div>
-              <div className="text-xs text-[#94A3B8] font-mono mt-0.5">
-                Official Blockchain Evidence Disclosure & Asset Freeze Request
-              </div>
-            </div>
-            <div className="text-right font-mono text-xs">
-              <div className="text-white font-bold">{investigation.caseNumber}</div>
-              <div className="text-[#64748B]">{new Date().toISOString().slice(0, 10)}</div>
-            </div>
-          </div>
-
-          {/* Case Overview Grid */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 font-mono text-[11px]">
-            <div className="p-2.5 bg-[#121722] border border-[#1E293B] rounded">
-              <span className="text-[#64748B] block text-[10px]">SCAM CLASSIFICATION</span>
-              <span className="text-white font-bold">{investigation.scamType}</span>
-            </div>
-            <div className="p-2.5 bg-[#121722] border border-[#1E293B] rounded">
-              <span className="text-[#64748B] block text-[10px]">TARGET VASP</span>
-              <span className="text-[#0C6CF2] font-bold">{topAttribution?.vaspName || 'Binance'}</span>
-            </div>
-            <div className="p-2.5 bg-[#121722] border border-[#1E293B] rounded">
-              <span className="text-[#64748B] block text-[10px]">ATTRIBUTION SCORE</span>
-              <span className="text-emerald-400 font-bold">{topAttribution?.confidenceScore}% Match</span>
-            </div>
-            <div className="p-2.5 bg-[#121722] border border-[#1E293B] rounded">
-              <span className="text-[#64748B] block text-[10px]">TRACED VOLUME</span>
-              <span className="text-white font-bold">{investigation.totalTracedVolumeBtc} BTC</span>
-            </div>
-          </div>
-
-          {/* Executive Summary */}
-          <div className="space-y-1">
-            <h4 className="text-xs font-bold text-white uppercase tracking-wider font-sans">
-              1. Executive Summary & Evidence Finding
-            </h4>
-            <p className="p-3 bg-[#121722] border border-[#1E293B] rounded leading-relaxed text-[#94A3B8]">
-              {investigation.summary}
-            </p>
-          </div>
-
-          {/* Attribution Breakdown */}
-          <div className="space-y-2">
-            <h4 className="text-xs font-bold text-white uppercase tracking-wider font-sans">
-              2. Candidate VASP Destination Cluster
-            </h4>
-            <div className="p-3 bg-[#121722] border border-[#1E293B] rounded font-mono space-y-1">
-              <div className="flex justify-between">
-                <span className="text-[#64748B]">Destination Deposit Cluster:</span>
-                <span className="text-[#0C6CF2] font-bold">{topAttribution?.destinationWallet}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-[#64748B]">Cluster Identifier:</span>
-                <span className="text-white">{topAttribution?.depositClusterId}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-[#64748B]">Hop Proximity:</span>
-                <span className="text-white">{topAttribution?.hopProximity} Hops from Source</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Formal Action Instructions */}
-          <div className="space-y-1">
-            <h4 className="text-xs font-bold text-white uppercase tracking-wider font-sans">
-              3. Recommended Law Enforcement Action
-            </h4>
-            <div className="p-3 bg-red-500/10 border border-red-500/30 rounded text-red-300 space-y-1">
-              <div className="font-bold font-mono">EMERGENCY COMPLIANCE HOLD REQUEST</div>
-              <p className="text-[11px] leading-relaxed">
-                Pursuant to financial crime regulations and emergency legal freeze procedures, request compliance desk of {topAttribution?.vaspName || 'Exchange'} to immediately place an administrative hold on incoming funds originating from cluster <code className="font-mono text-white">{topAttribution?.depositClusterId}</code>.
-              </p>
-            </div>
-          </div>
+        <div className="p-6 overflow-y-auto max-h-[70vh] bg-white text-ink-black">
+          <ForensicReport investigation={investigation} />
         </div>
 
         {/* Action Buttons Footer */}
-        <div className="p-4 bg-[#0B0E14] flex flex-wrap items-center justify-between gap-3">
+        <div className="p-4 bg-[#0B0E14] flex flex-wrap items-center justify-between gap-3 border-t border-[#1E293B]">
           <div className="flex items-center space-x-2">
             <button
               onClick={handleCopySummary}
@@ -165,15 +95,29 @@ Timestamp: ${new Date().toUTCString()}`;
               <Download className="w-3.5 h-3.5 text-[#94A3B8]" />
               <span>JSON Bundle</span>
             </button>
+            <a
+              href="/report"
+              className="px-3 py-1.5 bg-[#182030] hover:bg-[#1E293B] border border-[#1E293B] text-white text-xs font-medium rounded flex items-center space-x-1.5 transition"
+            >
+              <FileText className="w-3.5 h-3.5 text-[#0C6CF2]" />
+              <span>Dedicated Report View</span>
+            </a>
           </div>
 
           <div className="flex items-center space-x-2">
+            <button
+              onClick={handleDownloadPDF}
+              className="px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white text-xs font-semibold rounded flex items-center space-x-1.5 transition"
+            >
+              <Download className="w-4 h-4" />
+              <span>Download PDF</span>
+            </button>
             <button
               onClick={handlePrintPDF}
               className="px-4 py-2 bg-[#0C6CF2] hover:bg-blue-600 text-white text-xs font-semibold rounded flex items-center space-x-1.5 transition"
             >
               <Printer className="w-4 h-4" />
-              <span>Print / Save PDF</span>
+              <span>Print / Save PDF (A4)</span>
             </button>
           </div>
         </div>

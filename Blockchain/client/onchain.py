@@ -8,12 +8,15 @@ input/output detail in one call.
 """
 from __future__ import annotations
 
+import logging
 import time
 
 import requests
 
 from Blockchain.client import cache
 from Blockchain.models import Edge
+
+logger = logging.getLogger(__name__)
 
 BLOCKCHAIN_INFO_BASE = "https://blockchain.info"
 BLOCKCHAIR_BASE = "https://api.blockchair.com/bitcoin"
@@ -23,6 +26,15 @@ CACHE_MAX_AGE_SECONDS = 6 * 60 * 60  # 6h: on-chain history for a given address 
 
 class OnChainClientError(RuntimeError):
     pass
+
+
+def _normalize_addr(addr: str | None) -> str | None:
+    if not addr:
+        return None
+    cleaned = addr.strip()
+    if cleaned.lower().startswith("bc1"):
+        return cleaned.lower()
+    return cleaned
 
 
 def _cached_get(url: str, params: dict | None = None) -> dict:
@@ -43,28 +55,37 @@ def fetch_outgoing_edges(address: str, limit: int = 50) -> list[Edge]:
     """Returns outgoing transfers (address -> counterparty) for `address`,
     using Blockchain.com's rawaddr endpoint. Self-change outputs (back to
     `address`) are excluded since they aren't a hop outward."""
-    url = f"{BLOCKCHAIN_INFO_BASE}/rawaddr/{address}"
+    norm_address = _normalize_addr(address) or address
+    url = f"{BLOCKCHAIN_INFO_BASE}/rawaddr/{norm_address}"
     data = _cached_get(url, params={"limit": limit})
 
     edges: list[Edge] = []
-    for tx in data.get("txs", []):
+    raw_txs = data.get("txs", [])
+    for tx in raw_txs:
         input_addrs = {
-            inp.get("prev_out", {}).get("addr")
+            _normalize_addr(inp.get("prev_out", {}).get("addr"))
             for inp in tx.get("inputs", [])
             if inp.get("prev_out")
         }
-        if address not in input_addrs:
+        input_addrs.discard(None)
+        if norm_address not in input_addrs:
             continue  # address was only a recipient in this tx, not a sender
 
         tx_hash = tx.get("hash", "")
         ts = tx.get("time", int(time.time()))
         for out in tx.get("out", []):
-            dst = out.get("addr")
-            if not dst or dst == address:
+            dst = _normalize_addr(out.get("addr"))
+            if not dst or dst == norm_address:
                 continue
             value_btc = out.get("value", 0) / 1e8
-            edges.append(Edge(src=address, dst=dst, tx_hash=tx_hash, value_btc=value_btc, timestamp=ts))
+            edges.append(Edge(src=norm_address, dst=dst, tx_hash=tx_hash, value_btc=value_btc, timestamp=ts))
 
+    logger.info(
+        "Address %s: %d provider transactions, %d outgoing transfers parsed",
+        norm_address,
+        len(raw_txs),
+        len(edges),
+    )
     return edges
 
 

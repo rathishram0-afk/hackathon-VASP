@@ -38,7 +38,11 @@ export interface GraphNode {
   label: string;
   nodeType: NodeType;
   blockchain: BlockchainType;
-  riskScore: number;
+  /** Real backend-derived candidate confidence (0-100), or null when the
+   * backend provides no per-node score for this address. */
+  riskScore: number | null;
+  candidateConfidence?: number | null;
+  isMainPath?: boolean;
   hop: number;
   balanceBtc: number;
   entityName?: string;

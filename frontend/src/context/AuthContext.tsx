@@ -56,13 +56,20 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(userFromSession(session));
-      setIsLoading(false);
-    });
+    supabase.auth
+      .getSession()
+      .then(({ data: { session } }) => {
+        setUser(userFromSession(session));
+        setIsLoading(false);
+      })
+      .catch((err) => {
+        console.error('Failed to get Supabase session:', err);
+        setIsLoading(false);
+      });
 
     const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(userFromSession(session));
+      setIsLoading(false);
     });
 
     return () => {
@@ -76,6 +83,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       return { success: false, error: error.message };
     }
     setUser(userFromSession(data.session));
+    setIsLoading(false);
     return { success: true };
   };
 
@@ -90,13 +98,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
     if (data.session) {
       setUser(userFromSession(data.session));
+      setIsLoading(false);
     }
     return { success: true };
   };
 
   const logout = async () => {
-    await supabase.auth.signOut();
-    setUser(null);
+    try {
+      await supabase.auth.signOut();
+    } catch (err) {
+      console.error('Logout error:', err);
+    } finally {
+      setUser(null);
+    }
   };
 
   return (

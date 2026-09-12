@@ -5,178 +5,100 @@ import Link from 'next/link';
 import { NavigationHeader } from '@/components/layout/NavigationHeader';
 import { CaseScopeBar } from '@/components/layout/CaseScopeBar';
 import { Footer } from '@/components/layout/Footer';
+import { ForensicReport } from '@/components/report/ForensicReport';
 import { useInvestigation } from '@/hooks/useInvestigation';
-import { FileText, Download, Printer, ShieldCheck, CheckCircle2, Building, Layers, ArrowLeft } from 'lucide-react';
+import { Printer, Download, ArrowLeft, ShieldCheck, FileCheck } from 'lucide-react';
 
 export default function ReportPage() {
-  const { activeCase, attributions, evidence } = useInvestigation();
+  const { activeCase, graphData, attributions, evidence, mixerPatterns } = useInvestigation();
 
-  const handlePrintReport = () => {
+  const handlePrint = () => {
     window.print();
   };
 
-  const handleDownloadPdf = () => {
-    alert(`Downloading Official Forensic Report Dossier: ${activeCase.id}_Forensic_Report.pdf`);
-  };
-
   return (
-    <div className="min-h-screen flex flex-col bg-canvas-cream">
-      <NavigationHeader />
-      <CaseScopeBar />
+    <div className="min-h-screen flex flex-col bg-canvas-cream print:bg-white">
+      {/* Non-printable layout elements */}
+      <div className="no-print">
+        <NavigationHeader />
+        <CaseScopeBar />
+      </div>
 
-      <main className="flex-1 w-full max-w-5xl mx-auto px-4 sm:px-8 py-8 space-y-8 lg:pl-64">
-        {/* Top Control Header */}
-        <div className="flex flex-wrap items-center justify-between gap-4">
+      <main className="flex-1 w-full max-w-5xl mx-auto px-4 sm:px-8 py-8 space-y-6 lg:pl-64 print:pl-0 print:max-w-none print:w-full print:mx-0 print:p-0 print:space-y-0">
+        {/* Top Control Bar (Screen only) */}
+        <div className="no-print flex flex-wrap items-center justify-between gap-4 p-4 rounded-2xl bg-pure-white border border-surface-dim shadow-xs">
           <Link
             href="/dashboard"
-            className="inline-flex items-center gap-1.5 font-outfit text-xs text-slate-gray hover:text-ink-black font-bold"
+            className="inline-flex items-center gap-1.5 font-outfit text-xs text-slate-gray hover:text-ink-black font-bold transition-colors"
           >
             <ArrowLeft className="w-4 h-4" />
             <span>Back to Dashboard</span>
           </Link>
 
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="hidden sm:flex items-center gap-1.5 text-xs font-outfit text-slate-gray pr-2 border-r border-surface-dim">
+              <ShieldCheck className="w-4 h-4 text-signal-orange" />
+              <span>Forensic Investigation #{activeCase.id}</span>
+            </div>
+
             <button
-              onClick={handlePrintReport}
-              className="px-4 py-2.5 rounded-full bg-pure-white border border-surface-dim text-ink-black font-outfit font-semibold text-xs hover:bg-surface-container-high transition-colors flex items-center gap-1.5"
+              onClick={() => {
+                import('@/lib/pdfExport').then(({ downloadForensicReportPDF }) => {
+                  import('@/lib/reportData').then(({ normalizeReportData }) => {
+                    const data = normalizeReportData({
+                      caseObj: activeCase,
+                      graphData,
+                      attributions,
+                      evidence,
+                      mixerPatterns,
+                    });
+                    downloadForensicReportPDF(data);
+                  });
+                });
+              }}
+              className="px-5 py-2.5 rounded-full bg-signal-orange hover:bg-orange-600 text-pure-white font-outfit font-bold text-xs flex items-center gap-2 transition-all shadow-sm active:scale-95 cursor-pointer"
+              title="Download official PDF forensic dossier with all 12 sections"
             >
-              <Printer className="w-3.5 h-3.5 text-slate-gray" />
-              <span>Print Document</span>
+              <Download className="w-4 h-4 text-pure-white" />
+              <span>Download PDF Document</span>
             </button>
 
             <button
-              onClick={handleDownloadPdf}
-              className="px-5 py-2.5 rounded-full bg-ink-black text-pure-white hover:bg-signal-orange transition-colors font-outfit font-bold text-xs shadow-md flex items-center gap-2"
+              onClick={handlePrint}
+              className="px-5 py-2.5 rounded-full bg-ink-black hover:bg-slate-800 text-pure-white font-outfit font-bold text-xs flex items-center gap-2 transition-all shadow-sm active:scale-95 cursor-pointer"
+              title="Print directly or save as a high-resolution PDF document"
             >
-              <Download className="w-4 h-4" />
-              <span>Export Dossier (PDF/JSON)</span>
+              <Printer className="w-4 h-4 text-pure-white" />
+              <span>Print / Save as PDF (A4)</span>
             </button>
           </div>
         </div>
 
-        {/* Formal Report Document Paper Container */}
-        <div className="p-8 sm:p-12 rounded-[40px] bg-pure-white border border-surface-dim shadow-[0_24px_48px_rgba(20,20,19,0.06)] space-y-8 text-ink-black">
-          {/* Header & Attestation Seal */}
-          <div className="flex flex-wrap items-start justify-between gap-6 pb-6 border-b border-surface-dim">
-            <div className="space-y-1">
-              <div className="flex items-center gap-2">
-                <ShieldCheck className="w-6 h-6 text-signal-orange" />
-                <span className="font-outfit font-bold text-xl tracking-wider text-ink-black uppercase">
-                  VASP TRACE FORENSIC DOSSIER
-                </span>
-              </div>
-              <p className="font-dmsans text-xs text-slate-gray">
-                Official Court-Admissible Blockchain Intelligence Report
-              </p>
-            </div>
-
-            <div className="text-right font-outfit text-xs space-y-1">
-              <span className="px-3 py-1 rounded-full bg-surface-container text-ink-black font-bold block">
-                CASE #{activeCase.id}
-              </span>
-              <span className="text-slate-gray block text-[11px] pt-1">
-                Generated: {activeCase.lastUpdated}
-              </span>
-              <span className="text-signal-orange font-bold text-[10px] uppercase block">
-                ISO/IEC 27037 Attested System
-              </span>
-            </div>
+        {/* Informational Guidance Banner (Screen only) */}
+        <div className="no-print p-3 rounded-xl bg-lifted-cream border border-surface-dim text-xs font-outfit text-slate-gray flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <FileCheck className="w-4 h-4 text-signal-orange shrink-0" />
+            <span>
+              This formal dossier is compiled dynamically from active investigation ledger data. To generate an official PDF file, click <strong>Print / Save as PDF</strong> and choose <strong>Save as PDF</strong> as your destination printer.
+            </span>
           </div>
+        </div>
 
-          {/* Executive Summary Section */}
-          <div className="space-y-3">
-            <h2 className="font-outfit font-bold text-base uppercase tracking-wider text-slate-gray border-b border-surface-dim pb-1">
-              1. Executive Case Summary
-            </h2>
-            <p className="font-dmsans text-sm text-ink-black leading-relaxed">
-              {activeCase.summary}
-            </p>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 p-4 rounded-2xl bg-surface-container/40 font-outfit text-xs">
-              <div>
-                <span className="text-slate-gray block">Source Network:</span>
-                <span className="font-bold text-ink-black">{activeCase.network}</span>
-              </div>
-              <div>
-                <span className="text-slate-gray block">Exfiltrated Volume:</span>
-                <span className="font-mono font-bold text-signal-orange">{activeCase.totalVolumeBtc} BTC</span>
-              </div>
-              <div>
-                <span className="text-slate-gray block">Target Candidate:</span>
-                <span className="font-bold text-ink-black">{activeCase.candidateVasp}</span>
-              </div>
-              <div>
-                <span className="text-slate-gray block">Attribution Confidence:</span>
-                <span className="font-bold text-emerald-600">{activeCase.confidenceScore}% Verified</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Target VASP Attribution Certificate */}
-          <div className="p-6 rounded-3xl bg-lifted-cream border border-signal-orange/30 space-y-4">
-            <div className="flex items-center justify-between">
-              <h3 className="font-outfit font-bold text-lg text-ink-black flex items-center gap-2">
-                <Building className="w-5 h-5 text-signal-orange" />
-                <span>Primary Attributed VASP Entity</span>
-              </h3>
-              <span className="px-3 py-1 rounded-full bg-signal-orange text-pure-white font-outfit text-xs font-bold">
-                91% MATCH
-              </span>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 font-outfit text-xs">
-              <div>
-                <span className="text-slate-gray block">Entity Name:</span>
-                <span className="font-bold text-ink-black text-sm">{attributions[0]?.name || 'Binance'}</span>
-              </div>
-              <div>
-                <span className="text-slate-gray block">Deposit Cluster ID:</span>
-                <span className="font-mono font-bold text-ink-black">{attributions[0]?.clusterId || '#BN-US-481'}</span>
-              </div>
-              <div>
-                <span className="text-slate-gray block">Swept Deposit Address:</span>
-                <span className="font-mono text-xs text-signal-orange font-bold break-all">
-                  {attributions[0]?.depositAddress || 'bc1qVaspDep91Binance884901'}
-                </span>
-              </div>
-            </div>
-          </div>
-
-          {/* Evidence Digest Table */}
-          <div className="space-y-3">
-            <h2 className="font-outfit font-bold text-base uppercase tracking-wider text-slate-gray border-b border-surface-dim pb-1">
-              2. Supporting On-Chain Evidence Signals
-            </h2>
-
-            <div className="space-y-2 font-outfit text-xs">
-              {evidence.map((item) => (
-                <div key={item.id} className="p-3 rounded-xl bg-surface-container/40 flex items-center justify-between gap-4">
-                  <div className="space-y-0.5">
-                    <span className="font-bold text-ink-black block">{item.title}</span>
-                    <span className="font-dmsans text-[11px] text-slate-gray block">{item.description}</span>
-                  </div>
-                  <span className="font-mono font-bold text-signal-orange shrink-0">
-                    +{item.confidenceContribution}% Contribution
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Sign-off & Legal Attestation */}
-          <div className="pt-6 border-t border-surface-dim flex flex-wrap items-center justify-between gap-4 font-outfit text-xs text-slate-gray">
-            <div>
-              <span className="block font-bold text-ink-black">Lead Forensic Officer:</span>
-              <span>{activeCase.investigator}</span>
-            </div>
-            <div className="text-right">
-              <span className="block font-bold text-ink-black">Attestation Status:</span>
-              <span className="text-emerald-700 font-bold">DIGITALLY SIGNED & SEALED</span>
-            </div>
-          </div>
+        {/* Formal Report Document Container */}
+        <div className="rounded-[32px] bg-white border border-surface-dim shadow-[0_20px_50px_rgba(20,20,19,0.06)] print:shadow-none print:border-none print:rounded-none overflow-hidden">
+          <ForensicReport
+            caseObj={activeCase}
+            graphData={graphData}
+            attributions={attributions}
+            evidence={evidence}
+            mixerPatterns={mixerPatterns}
+          />
         </div>
       </main>
 
-      <Footer />
+      <div className="no-print">
+        <Footer />
+      </div>
     </div>
   );
 }

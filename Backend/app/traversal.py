@@ -9,7 +9,7 @@ from dataclasses import dataclass, field
 
 import networkx as nx
 
-from Blockchain.hops import get_next_hops
+from Blockchain.hops import ProviderUnavailableError, get_next_hops
 from Blockchain.tag_list import ExchangeTag
 
 DEFAULT_MAX_HOPS = 4
@@ -66,8 +66,17 @@ def traverse(
 
         try:
             hops = get_next_hops(address)
-        except Exception:
-            # live API hiccup on this node: treat as a dead-end branch rather than failing the whole trace
+        except ProviderUnavailableError:
+            if address == source:
+                # No data was ever retrieved for the trace's own source address.
+                # A graph containing only the (unexpanded) source node is
+                # indistinguishable from a legitimate zero-transaction address --
+                # surface this as a real failure instead of a misleadingly
+                # "successful" empty trace.
+                raise
+            # A deeper node's lookup failed after real data was already
+            # gathered elsewhere in the trace: treat this one branch as a dead
+            # end rather than discarding an otherwise-useful partial trace.
             result.frontier_untagged.append(address)
             continue
 

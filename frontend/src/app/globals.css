@@ -1,20 +1,20 @@
 @import "tailwindcss";
 
 @theme {
-  --color-canvas-cream: #F8F9FA;
-  --color-lifted-cream: #FFFFFF;
-  --color-ink-black: #0C0D0E;
-  --color-pure-white: #FFFFFF;
+  --color-canvas-cream: var(--canvas-cream);
+  --color-lifted-cream: var(--lifted-cream);
+  --color-ink-black: var(--ink-black);
+  --color-pure-white: var(--pure-white);
   --color-signal-orange: #F5B718;
   --color-signal-orange-light: #FBBF24;
-  --color-slate-gray: #6B7280;
+  --color-slate-gray: var(--slate-gray);
   --color-link-blue: #2563EB;
-  --color-surface-container: #F3F4F6;
-  --color-surface-container-high: #E5E7EB;
-  --color-surface-container-low: #F9FAFB;
-  --color-surface-container-lowest: #FFFFFF;
-  --color-surface-dim: #E5E7EB;
-  --color-error-container: #FEE2E2;
+  --color-surface-container: var(--surface-container);
+  --color-surface-container-high: var(--surface-container-high);
+  --color-surface-container-low: var(--surface-container-low);
+  --color-surface-container-lowest: var(--surface-container-lowest);
+  --color-surface-dim: var(--surface-dim);
+  --color-error-container: var(--error-container);
   --color-error: #EF4444;
 
   --font-outfit: 'Outfit', sans-serif;
@@ -22,15 +22,44 @@
   --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 }
 
+:root {
+  --canvas-cream: #F8F9FA;
+  --lifted-cream: #FFFFFF;
+  --ink-black: #0C0D0E;
+  --pure-white: #FFFFFF;
+  --slate-gray: #6B7280;
+  --surface-container: #F3F4F6;
+  --surface-container-high: #E5E7EB;
+  --surface-container-low: #F9FAFB;
+  --surface-container-lowest: #FFFFFF;
+  --surface-dim: #E5E7EB;
+  --error-container: #FEE2E2;
+}
+
+html.dark {
+  --canvas-cream: #0B0D11;
+  --lifted-cream: #14171E;
+  --ink-black: #F3F4F6;
+  --pure-white: #14171E;
+  --slate-gray: #9CA3AF;
+  --surface-container: #1C2028;
+  --surface-container-high: #272C38;
+  --surface-container-low: #111319;
+  --surface-container-lowest: #0B0D11;
+  --surface-dim: #262B37;
+  --error-container: #3E1616;
+}
+
 @layer base {
   html, body {
     margin: 0;
     padding: 0;
-    background-color: #F8F9FA;
-    color: #0C0D0E;
+    background-color: var(--canvas-cream);
+    color: var(--ink-black);
     font-family: 'DM Sans', sans-serif;
     overscroll-behavior: none;
     -webkit-font-smoothing: antialiased;
+    transition: background-color 0.15s ease, color 0.15s ease;
   }
 }
 
@@ -71,4 +100,12 @@
 
 .node-glow-vasp {
   filter: drop-shadow(0 0 12px rgba(245, 183, 24, 0.6));
+}
+
+.node-glow-mixer {
+  filter: drop-shadow(0 0 10px rgba(139, 92, 246, 0.5));
+}
+
+.node-glow-highrisk {
+  filter: drop-shadow(0 0 12px rgba(220, 38, 38, 0.65));
 }

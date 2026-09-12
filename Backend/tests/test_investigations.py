@@ -11,6 +11,7 @@ from fastapi.testclient import TestClient
 from Backend.app import investigations_db as db
 from Backend.app.auth import AuthenticatedUser, get_current_user
 from Backend.app.main import app
+from Blockchain.hops import ProviderUnavailableError
 
 USER_A = AuthenticatedUser(id="11111111-1111-1111-1111-111111111111", email="a@example.com")
 USER_B = AuthenticatedUser(id="22222222-2222-2222-2222-222222222222", email="b@example.com")
@@ -70,6 +71,78 @@ def test_trace_still_works_unauthenticated():
     mock_run_trace.assert_called_once()
     # /trace is intentionally NOT behind auth -- unchanged public contract
     assert "wallet_address" in mock_run_trace.call_args.kwargs
+
+
+def test_trace_with_populated_graph_returns_nodes_and_edges_unchanged():
+    # Locks in the existing successful-trace response shape (nodes + edges +
+    # candidates), so the provider-error-handling change can't regress it.
+    populated_result = {
+        "source": SOURCE_ADDRESS,
+        "truncated": False,
+        "graph": {
+            "nodes": [
+                {"address": SOURCE_ADDRESS, "hop_distance": 0, "tag": None},
+                {"address": "counterparty1", "hop_distance": 1, "tag": None},
+            ],
+            "edges": [
+                {"src": SOURCE_ADDRESS, "dst": "counterparty1", "tx_hash": "h1", "value_btc": 0.5, "timestamp": 1_700_000_000}
+            ],
+        },
+        "candidates": [],
+    }
+    with patch("Backend.app.main.run_trace", return_value=populated_result):
+        resp = client.post("/trace", json={"wallet_address": SOURCE_ADDRESS})
+
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body == populated_result
+    assert len(body["graph"]["nodes"]) == 2
+    assert len(body["graph"]["edges"]) == 1
+
+
+def test_trace_with_legitimate_zero_transaction_address_still_returns_200():
+    # A real address with no outgoing transactions is a successful trace,
+    # not an error -- must stay 200 with a genuinely empty (but honest)
+    # single-node graph.
+    empty_result = {
+        "source": SOURCE_ADDRESS,
+        "truncated": False,
+        "graph": {"nodes": [{"address": SOURCE_ADDRESS, "hop_distance": 0, "tag": None}], "edges": []},
+        "candidates": [],
+    }
+    with patch("Backend.app.main.run_trace", return_value=empty_result):
+        resp = client.post("/trace", json={"wallet_address": SOURCE_ADDRESS})
+
+    assert resp.status_code == 200
+    assert resp.json() == empty_result
+
+
+def test_trace_returns_502_when_blockchain_provider_unavailable():
+    with patch(
+        "Backend.app.main.run_trace",
+        side_effect=ProviderUnavailableError("Blockchain data provider unavailable: both configured providers failed"),
+    ):
+        resp = client.post("/trace", json={"wallet_address": SOURCE_ADDRESS})
+
+    assert resp.status_code == 502
+    assert "Blockchain data provider unavailable" in resp.json()["detail"]
+
+
+def test_trace_returns_500_on_unexpected_internal_error():
+    # An unhandled, non-provider exception is a real bug -- it must not be
+    # mistaken for a provider outage (502) or masked as a successful trace.
+    no_raise_client = TestClient(app, raise_server_exceptions=False)
+    with patch("Backend.app.main.run_trace", side_effect=ValueError("unexpected bug")):
+        resp = no_raise_client.post("/trace", json={"wallet_address": SOURCE_ADDRESS})
+
+    assert resp.status_code == 500
+
+
+def test_trace_returns_422_for_invalid_wallet_address():
+    # Too-short to be any real address -- existing request validation,
+    # unaffected by the provider-error-handling change.
+    resp = client.post("/trace", json={"wallet_address": "x"})
+    assert resp.status_code == 422
 
 
 # ---------------------------------------------------------------------------

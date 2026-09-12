@@ -307,7 +307,7 @@ export function TransactionGraph({
           <div className="flex items-center justify-between gap-2 border-b border-[#1E293B] pb-1.5">
             <span className="font-mono text-[#0C6CF2] font-semibold">{hoveredNode.label}</span>
             <span className="px-1.5 py-0.5 bg-red-500/10 text-red-400 font-mono font-bold text-[10px] rounded">
-              Risk Score: {hoveredNode.riskScore}/100
+              {hoveredNode.riskScore === null ? 'Risk Score: Unscored' : `Risk Score: ${hoveredNode.riskScore}/100`}
             </span>
           </div>
           <div className="text-white font-medium">{hoveredNode.entityName || 'Unhosted Node'}</div>

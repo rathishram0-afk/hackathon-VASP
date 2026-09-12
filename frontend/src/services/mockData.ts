@@ -531,7 +531,7 @@ export function getMockWalletDetails(address: string): Wallet {
     txCount: isVasp ? 142900 : isMixer ? 890 : 42,
     firstSeen: '2024-03-12 08:14:22',
     lastSeen: '2026-09-11 17:30:10',
-    riskScore: isSource ? 96 : isMixer ? 88 : isVasp ? 15 : 64,
+    riskScore: isSource ? 96 : 0,
     classification: isSource ? 'scam_source' : isMixer ? 'mixer' : isVasp ? 'vasp' : 'intermediary',
     entityName: isVasp ? 'Verified Exchange Deposit Cluster' : isSource ? 'LockBit Ransomware Source' : isMixer ? 'ChipMixer Pass-Through' : 'Unhosted Relay Wallet',
     knownTags: isVasp ? ['VASP', 'Exchange', 'KYC-Enforced'] : isSource ? ['High Risk', 'Ransomware', 'OFAC Alert'] : ['Unhosted', 'Multi-sig'],

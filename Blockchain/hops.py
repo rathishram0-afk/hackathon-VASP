@@ -18,6 +18,15 @@ from Blockchain.tag_list import ExchangeTag, lookup_address
 logger = logging.getLogger(__name__)
 
 
+class ProviderUnavailableError(RuntimeError):
+    """Raised when no configured blockchain data provider could serve a
+    request (e.g. all are rate-limited or blacklisted).
+
+    Distinct from a provider successfully responding with zero
+    transactions -- that is a legitimate result, not a failure, and must
+    never be reported through this exception."""
+
+
 @dataclass(frozen=True)
 class Hop:
     edge: Edge
@@ -32,9 +41,9 @@ def _fetch_outgoing_edges(address: str, limit: int) -> list[Edge]:
         try:
             return blockchair.fetch_outgoing_edges(address, limit=limit)
         except blockchair.BlockchairClientError as fallback_exc:
-            raise onchain.OnChainClientError(
-                f"both on-chain providers failed for {address}: "
-                f"blockchain.com=({primary_exc}) blockchair=({fallback_exc})"
+            raise ProviderUnavailableError(
+                f"Blockchain data provider unavailable: both configured providers failed for "
+                f"{address} (blockchain.com: {primary_exc}; blockchair: {fallback_exc})"
             ) from fallback_exc
 
 

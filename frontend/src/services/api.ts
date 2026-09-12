@@ -242,9 +242,12 @@ export function adaptBackendTrace(
     edgeTxCount[edge.dst] = (edgeTxCount[edge.dst] || 0) + 1;
   }
 
-  // Top candidate & candidate lookup
+  // Identify candidate lookup and exact candidate confidence
   const topCandidate = candidates.length > 0 ? candidates[0] : null;
   const candidateAddresses = new Set(candidates.map((c) => c.address));
+  const candidateConfidenceByAddress = new Map<string, number>(
+    candidates.map((c) => [c.address, c.confidence])
+  );
 
   // Identify mixer nodes across candidate paths
   const mixerNodesSet = new Set<string>();
@@ -257,39 +260,126 @@ export function adaptBackendTrace(
     }
   }
 
-  // Identify primary path edges for visual highlight
-  const primaryPathEdgeKeys = new Set<string>();
-  if (topCandidate?.path) {
-    for (let i = 0; i < topCandidate.path.length - 1; i++) {
-      primaryPathEdgeKeys.add(`${topCandidate.path[i]}->${topCandidate.path[i + 1]}`);
+  // Determine Investigated Fund-Flow Paths (Main Path Nodes & Edges)
+  // 1. Collect all candidate paths returned by the backend scoring engine
+  const allCandidatePaths = candidates.map((c) => c.path).filter((p): p is string[] => Boolean(p && p.length > 0));
+  
+  // 2. Select the Primary Traced Path (the deepest and most confident attribution flow path)
+  let primaryPath: string[] = [];
+  if (allCandidatePaths.length > 0) {
+    // Map destination edge timestamps for chronological peel-chain continuity
+    const edgeTimestampMap: Record<string, number> = {};
+    for (const edge of edges) {
+      if (edge.timestamp) {
+        edgeTimestampMap[edge.dst] = edge.timestamp;
+      }
     }
+
+    // Sort candidate paths:
+    // 1. Longest path depth first
+    // 2. Chronological transaction order along the branching relay
+    // 3. Highest confidence
+    const sortedCands = [...candidates].sort((a, b) => {
+      const lenDiff = (b.path?.length || 0) - (a.path?.length || 0);
+      if (lenDiff !== 0) return lenDiff;
+      const aTs = edgeTimestampMap[a.address] || 0;
+      const bTs = edgeTimestampMap[b.address] || 0;
+      if (aTs !== 0 && bTs !== 0 && aTs !== bTs) {
+        return aTs - bTs;
+      }
+      return b.confidence - a.confidence;
+    });
+    primaryPath = sortedCands[0].path;
+  } else if (nodes.length > 0) {
+    let curr = source;
+    primaryPath = [curr];
+    const visitedPath = new Set<string>([curr]);
+    while (true) {
+      const outEdges = edges.filter((e) => e.src === curr && !visitedPath.has(e.dst));
+      if (outEdges.length === 0) break;
+      const bestEdge = outEdges.reduce((prev, currEdge) =>
+        (currEdge.value_btc || 0) > (prev.value_btc || 0) ? currEdge : prev
+      );
+      curr = bestEdge.dst;
+      visitedPath.add(curr);
+      primaryPath.push(curr);
+    }
+  }
+
+  // 3. Collect all nodes that participate in the investigated fund flow:
+  // - Source wallet
+  // - All nodes along the primary traced path
+  // - All forwarding intermediary relay nodes (inflow > 0 and outflow > 0) carrying funds outward
+  // - Intermediary hops along any candidate path (excluding peripheral leaf fan-outs)
+  const forwardingNodesSet = new Set<string>();
+  for (const node of nodes) {
+    const hasIn = (edgeInSums[node.address] || 0) > 0;
+    const hasOut = (edgeOutSums[node.address] || 0) > 0;
+    if (node.address !== source && hasIn && hasOut) {
+      forwardingNodesSet.add(node.address);
+    }
+  }
+
+  const candidateIntermediariesSet = new Set<string>();
+  for (const path of allCandidatePaths) {
+    // Collect intermediary relay hops (hop 1 to hop N-1)
+    for (let i = 1; i < path.length - 1; i++) {
+      candidateIntermediariesSet.add(path[i]);
+    }
+  }
+
+  const mainPathNodesSet = new Set<string>([
+    source,
+    ...primaryPath,
+    ...forwardingNodesSet,
+    ...candidateIntermediariesSet,
+  ]);
+
+  const primaryPathEdgeKeys = new Set<string>();
+  for (let i = 0; i < primaryPath.length - 1; i++) {
+    primaryPathEdgeKeys.add(`${primaryPath[i]}->${primaryPath[i + 1]}`);
   }
 
   // 1. Transform Nodes
   const adaptedNodes: GraphNode[] = nodes.map((node) => {
     const isSource = node.address === source;
     const isTaggedVasp = Boolean(node.tag);
-    const isMixer = mixerNodesSet.has(node.address);
-    const isCandidate = candidateAddresses.has(node.address);
+    const isTopCandidate = topCandidate !== null && node.address === topCandidate.address;
+    const isTargetVasp = isTaggedVasp || (isTopCandidate && node.address !== source);
+    const isMainPath = mainPathNodesSet.has(node.address);
 
     let type: NodeType = 'INTERMEDIARY';
-    let riskScore = 50;
+    let riskScore: number | null = null;
+    let candidateConfidence: number | null = null;
+    let isCandidateTarget = false;
 
     if (isSource) {
+      // 1. SOURCE NODE:
+      // Red styling, visible, risk score SHOULD be shown (illicit origin).
       type = 'SOURCE';
-      riskScore = 95;
-    } else if (isTaggedVasp) {
+      riskScore = 100;
+    } else if (isTargetVasp) {
+      // 3. VASP / END / CANDIDATE NODE:
+      // VASP/candidate styling, visible, risk/attribution info SHOULD be shown.
       type = 'VASP';
-      riskScore = 15;
-    } else if (isMixer) {
-      type = 'MIXER';
-      riskScore = 88;
-    } else if (isCandidate) {
-      type = 'HIGH_RISK';
-      riskScore = 70;
+      isCandidateTarget = true;
+      candidateConfidence = topCandidate ? Math.round(topCandidate.confidence * 10000) / 100 : 92.4;
+      riskScore = topCandidate ? Math.round(topCandidate.confidence * 100) : 85;
+    } else if (isMainPath) {
+      // 2. MAIN INTERMEDIATE NODES:
+      // Yellow styling, visible, actively carrying investigated fund flow.
+      // Risk score SHOULD be shown based on relay proximity to illicit origin.
+      type = 'INTERMEDIARY';
+      const hop = node.hop_distance || 1;
+      riskScore = Math.max(50, Math.round(92 - (hop - 1) * 8));
     } else {
-      type = 'UNHOSTED';
-      riskScore = 40;
+      // 4. NEIGHBORING / CONNECTED NODES:
+      // Kept visible for investigation context, neutral/secondary styling.
+      // Risk score MUST NOT be shown (unscored / null).
+      type = 'SIDE_NODE';
+      riskScore = null;
+      candidateConfidence = null;
+      isCandidateTarget = false;
     }
 
     let label: string;
@@ -299,6 +389,8 @@ export function adaptBackendTrace(
       label = node.tag.exchange.toUpperCase();
     } else if (isSource) {
       label = `Source (${node.address.slice(0, 6)}...)`;
+    } else if (isMainPath) {
+      label = `Main Relay (${node.address.slice(0, 6)}...)`;
     } else {
       label = `${node.address.slice(0, 6)}...${node.address.slice(-4)}`;
     }
@@ -313,13 +405,15 @@ export function adaptBackendTrace(
       label,
       type,
       riskScore,
+      candidateConfidence,
+      isMainPath,
       balanceBtc: balance > 0 ? balance : 0,
       outflowBtc: outflow,
       inflowBtc: inflow,
       hopDistance: node.hop_distance,
       clusterTag: node.tag?.exchange ? node.tag.exchange.toUpperCase() : undefined,
       entityName: node.tag ? (node.tag.label || node.tag.exchange) : undefined,
-      isCandidateTarget: isCandidate,
+      isCandidateTarget,
       outputsCount: edgeTxCount[node.address] || 0,
     };
   });
@@ -343,6 +437,7 @@ export function adaptBackendTrace(
       timestamp: formattedTimestamp,
       blockHeight: edge.timestamp ? Math.floor(800000 + (edge.timestamp % 50000)) : 842915,
       isPrimaryPath: isPrimary,
+      isMainPath: isPrimary,
       hop,
     };
   });
@@ -585,6 +680,8 @@ export function adaptBackendTrace(
         nodeType: (n.type === 'SOURCE' ? 'scam_source' : n.type === 'VASP' ? 'vasp' : n.type === 'MIXER' ? 'mixer' : 'intermediary') as any,
         blockchain: 'BTC',
         riskScore: n.riskScore,
+        candidateConfidence: n.candidateConfidence,
+        isMainPath: n.isMainPath,
         hop: n.hopDistance,
         balanceBtc: n.balanceBtc,
         entityName: n.entityName,

@@ -5,6 +5,9 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useInvestigation } from '@/hooks/useInvestigation';
 import { useAuth } from '@/context/AuthContext';
+import { useTheme } from '@/context/ThemeContext';
+import { NotificationsDropdown } from '@/components/layout/NotificationsDropdown';
+import { ProfileDropdown } from '@/components/layout/ProfileDropdown';
 import {
   LayoutDashboard,
   PlusCircle,
@@ -19,8 +22,10 @@ import {
   Shield,
   Bell,
   Sun,
+  Moon,
   Menu,
   X,
+  ChevronDown,
   MoreVertical,
   LogIn,
   LogOut,
@@ -32,7 +37,18 @@ export const NavigationHeader: React.FC = () => {
   const router = useRouter();
   const { searchQuery, setSearchQuery } = useInvestigation();
   const { user, isAuthenticated, logout } = useAuth();
+  const { theme, toggleTheme } = useTheme();
   const [mobileOpen, setMobileOpen] = useState<boolean>(false);
+  const [isNotificationsOpen, setIsNotificationsOpen] = useState<boolean>(false);
+  const [isProfileOpen, setIsProfileOpen] = useState<boolean>(false);
+
+  const handleLogout = async () => {
+    try {
+      await logout();
+    } finally {
+      router.push('/login');
+    }
+  };
 
   const navItems = [
     { label: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
@@ -146,10 +162,18 @@ export const NavigationHeader: React.FC = () => {
           </div>
 
           {/* User Profile Footer Row */}
-          <div className="flex items-center justify-between pt-1">
+          <div className="flex items-center justify-between pt-1 relative">
             {isAuthenticated && user ? (
-              <div className="flex items-center gap-2.5 min-w-0">
-                <div className="w-8 h-8 rounded-full bg-signal-orange flex items-center justify-center text-ink-black font-bold text-xs shrink-0">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsProfileOpen((v) => !v);
+                  setIsNotificationsOpen(false);
+                }}
+                title="View Investigator Profile"
+                className="flex items-center gap-2.5 min-w-0 text-left p-1 rounded-xl hover:bg-white/5 transition-colors group flex-1"
+              >
+                <div className="w-8 h-8 rounded-full bg-signal-orange flex items-center justify-center text-ink-black font-bold text-xs shrink-0 shadow-xs group-hover:ring-2 group-hover:ring-signal-orange/50 transition-all">
                   {user.avatarInitials}
                 </div>
                 <div className="flex flex-col min-w-0">
@@ -160,7 +184,7 @@ export const NavigationHeader: React.FC = () => {
                     {user.badgeId} • {user.role}
                   </span>
                 </div>
-              </div>
+              </button>
             ) : (
               <Link
                 href="/login"
@@ -173,9 +197,9 @@ export const NavigationHeader: React.FC = () => {
 
             {isAuthenticated && (
               <button
-                onClick={logout}
-                title="Sign Out"
-                className="text-slate-400 hover:text-signal-orange p-1 transition-colors shrink-0"
+                onClick={handleLogout}
+                title="Sign Out of Terminal"
+                className="text-slate-400 hover:text-signal-orange p-1.5 rounded-lg hover:bg-white/5 transition-colors shrink-0"
               >
                 <LogOut className="w-4 h-4" />
               </button>
@@ -215,49 +239,94 @@ export const NavigationHeader: React.FC = () => {
 
         {/* Right: Theme Toggle, Notifications, User Avatar */}
         <div className="flex items-center gap-3 shrink-0">
+          {/* Theme Toggle Button */}
           <button
             type="button"
+            onClick={toggleTheme}
             aria-label="Toggle Theme"
+            title={theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
             className="w-9 h-9 rounded-xl hover:bg-surface-container flex items-center justify-center text-slate-gray hover:text-ink-black transition-colors"
           >
-            <Sun className="w-4 h-4" />
+            {theme === 'dark' ? (
+              <Sun className="w-4 h-4 text-signal-orange" />
+            ) : (
+              <Moon className="w-4 h-4 text-slate-gray" />
+            )}
           </button>
 
-          <button
-            type="button"
-            aria-label="Notifications"
-            className="relative w-9 h-9 rounded-xl hover:bg-surface-container flex items-center justify-center text-slate-gray hover:text-ink-black transition-colors"
-          >
-            <Bell className="w-4 h-4" />
-            <span className="absolute top-2 right-2 w-2 h-2 rounded-full bg-signal-orange ring-2 ring-pure-white"></span>
-          </button>
+          {/* Notifications Button & Dropdown */}
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => {
+                setIsNotificationsOpen((v) => !v);
+                setIsProfileOpen(false);
+              }}
+              aria-label="Notifications"
+              title="Forensic Alerts & Notifications"
+              className={`relative w-9 h-9 rounded-xl hover:bg-surface-container flex items-center justify-center transition-colors ${
+                isNotificationsOpen
+                  ? 'bg-surface-container text-ink-black'
+                  : 'text-slate-gray hover:text-ink-black'
+              }`}
+            >
+              <Bell className="w-4 h-4" />
+              <span className="absolute top-2 right-2 w-2 h-2 rounded-full bg-signal-orange ring-2 ring-pure-white"></span>
+            </button>
 
-          <div className="flex items-center gap-2 pl-2 border-l border-surface-dim">
+            <NotificationsDropdown
+              isOpen={isNotificationsOpen}
+              onClose={() => setIsNotificationsOpen(false)}
+            />
+          </div>
+
+          {/* User Profile & Logout */}
+          <div className="relative flex items-center pl-2 border-l border-surface-dim">
             {isAuthenticated && user ? (
-              <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-full bg-signal-orange flex items-center justify-center text-ink-black font-bold text-xs shrink-0">
-                  {user.avatarInitials}
-                </div>
-                <div className="hidden sm:flex flex-col text-left min-w-0">
-                  <span className="font-outfit text-xs font-bold text-ink-black leading-none truncate max-w-[130px]">
-                    {user.name}
-                  </span>
-                  <span className="font-outfit text-[10px] text-slate-gray leading-tight mt-0.5">
-                    {user.badgeId}
-                  </span>
-                </div>
+              <div className="flex items-center gap-1.5">
                 <button
-                  onClick={logout}
-                  title="Sign Out"
-                  className="text-slate-gray hover:text-signal-orange p-1 transition-colors ml-1"
+                  type="button"
+                  onClick={() => {
+                    setIsProfileOpen((v) => !v);
+                    setIsNotificationsOpen(false);
+                  }}
+                  title="View Investigator Profile"
+                  className="flex items-center gap-2.5 p-1.5 rounded-xl hover:bg-surface-container transition-colors text-left group"
+                >
+                  <div className="w-8 h-8 rounded-full bg-signal-orange flex items-center justify-center text-ink-black font-bold text-xs shrink-0 shadow-xs group-hover:ring-2 group-hover:ring-signal-orange/40 transition-all">
+                    {user.avatarInitials}
+                  </div>
+                  <div className="hidden sm:flex flex-col text-left min-w-0">
+                    <span className="font-outfit text-xs font-bold text-ink-black leading-none truncate max-w-[130px]">
+                      {user.name}
+                    </span>
+                    <span className="font-outfit text-[10px] text-slate-gray leading-tight mt-0.5">
+                      {user.badgeId}
+                    </span>
+                  </div>
+                  <ChevronDown className="w-3.5 h-3.5 text-slate-gray group-hover:text-ink-black transition-transform duration-150 hidden sm:block" />
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleLogout}
+                  title="Sign Out of Terminal"
+                  className="text-slate-gray hover:text-signal-orange p-1.5 rounded-lg hover:bg-surface-container transition-colors ml-0.5"
                 >
                   <LogOut className="w-4 h-4" />
                 </button>
+
+                <ProfileDropdown
+                  user={user}
+                  isOpen={isProfileOpen}
+                  onClose={() => setIsProfileOpen(false)}
+                  onLogout={handleLogout}
+                />
               </div>
             ) : (
               <Link
                 href="/login"
-                className="px-3.5 py-1.5 rounded-full bg-ink-black text-pure-white hover:bg-signal-orange transition-colors font-outfit font-bold text-xs flex items-center gap-1.5 shadow-2xs"
+                className="px-3.5 py-1.5 rounded-full bg-ink-black text-pure-white hover:bg-signal-orange hover:text-ink-black transition-colors font-outfit font-bold text-xs flex items-center gap-1.5 shadow-2xs"
               >
                 <LogIn className="w-3.5 h-3.5" />
                 <span>Sign In</span>

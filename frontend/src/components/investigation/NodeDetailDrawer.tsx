@@ -23,7 +23,8 @@ export function NodeDetailDrawer({ node, onClose }: NodeDetailDrawerProps) {
     setTimeout(() => setCopied(false), 1500);
   };
 
-  const getRiskColor = (score: number) => {
+  const getRiskColor = (score: number | null) => {
+    if (score === null) return 'text-[#94A3B8] bg-[#1E293B]/40 border-[#1E293B]';
     if (score >= 80) return 'text-red-400 bg-red-500/10 border-red-500/30';
     if (score >= 50) return 'text-amber-400 bg-amber-500/10 border-amber-500/30';
     return 'text-emerald-400 bg-emerald-500/10 border-emerald-500/30';
@@ -58,9 +59,21 @@ export function NodeDetailDrawer({ node, onClose }: NodeDetailDrawerProps) {
         <div className="p-3.5 bg-[#182030] border border-[#1E293B] rounded-lg space-y-2">
           <div className="flex items-center justify-between">
             <span className="text-xs text-[#94A3B8] font-sans font-medium">Wallet Address</span>
-            <span className={`px-2 py-0.5 text-[10px] font-mono font-bold rounded border ${getRiskColor(node.riskScore)}`}>
-              Risk Score: {node.riskScore}/100
-            </span>
+            <div className="flex items-center gap-1.5">
+              {node.isMainPath && (
+                <span className="px-2 py-0.5 text-[10px] font-mono font-bold rounded border bg-amber-500/10 text-amber-400 border-amber-500/30">
+                  Main Flow
+                </span>
+              )}
+              {node.candidateConfidence != null && (
+                <span className="px-2 py-0.5 text-[10px] font-mono font-bold rounded border bg-[#0C6CF2]/10 text-[#0C6CF2] border-[#0C6CF2]/30">
+                  VASP Attribution: {node.candidateConfidence}%
+                </span>
+              )}
+              <span className={`px-2 py-0.5 text-[10px] font-mono font-bold rounded border ${getRiskColor(node.riskScore)}`}>
+                {node.riskScore === null ? 'Risk Score: Unscored' : `Risk Score: ${node.riskScore}/100`}
+              </span>
+            </div>
           </div>
 
           <div className="flex items-center justify-between bg-[#0B0E14] p-2 rounded border border-[#1E293B] font-mono text-xs text-white">

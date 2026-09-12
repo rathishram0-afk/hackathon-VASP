@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
@@ -20,7 +20,7 @@ import {
 
 export default function LoginPage() {
   const router = useRouter();
-  const { login, signUp, user } = useAuth();
+  const { login, signUp, user, isAuthenticated, isLoading } = useAuth();
 
   const [mode, setMode] = useState<'signin' | 'signup'>('signin');
   const [emailInput, setEmailInput] = useState<string>(user?.email || '');
@@ -31,6 +31,13 @@ export default function LoginPage() {
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  // If already authenticated, redirect to /dashboard
+  useEffect(() => {
+    if (!isLoading && isAuthenticated) {
+      router.replace('/dashboard');
+    }
+  }, [isAuthenticated, isLoading, router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -59,9 +66,7 @@ export default function LoginPage() {
     }
 
     setSuccessMessage('Credentials attested. Opening forensic workspace...');
-    setTimeout(() => {
-      router.push('/dashboard');
-    }, 600);
+    router.replace('/dashboard');
   };
 
   return (

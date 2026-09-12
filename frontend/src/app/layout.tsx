@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { Outfit, DM_Sans, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/context/AuthContext";
+import { ThemeProvider } from "@/context/ThemeContext";
+import { AuthGuard } from "@/components/auth/AuthGuard";
 import { InvestigationProvider } from "@/hooks/useInvestigation";
 
 const outfit = Outfit({
@@ -35,9 +37,15 @@ export default function RootLayout({
   return (
     <html
       lang="en"
+      suppressHydrationWarning
       className={`${outfit.variable} ${dmSans.variable} ${jetbrainsMono.variable} h-full antialiased`}
     >
       <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `try{const t=localStorage.getItem('vasp_theme');if(t==='dark'||(!t&&window.matchMedia('(prefers-color-scheme: dark)').matches)){document.documentElement.classList.add('dark');}else{document.documentElement.classList.remove('dark');}}catch(e){}`,
+          }}
+        />
         <link
           rel="stylesheet"
           href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0&display=swap"
@@ -45,9 +53,13 @@ export default function RootLayout({
       </head>
       <body className="bg-canvas-cream font-dmsans text-ink-black min-h-full flex flex-col antialiased selection:bg-signal-orange selection:text-pure-white">
         <AuthProvider>
-          <InvestigationProvider>
-            {children}
-          </InvestigationProvider>
+          <ThemeProvider>
+            <AuthGuard>
+              <InvestigationProvider>
+                {children}
+              </InvestigationProvider>
+            </AuthGuard>
+          </ThemeProvider>
         </AuthProvider>
       </body>
     </html>

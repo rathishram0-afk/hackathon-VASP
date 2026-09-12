@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import Link from 'next/link';
 import { useInvestigation } from '@/hooks/useInvestigation';
 import {
   X,
@@ -28,7 +29,8 @@ export const NodeDetailDrawer: React.FC = () => {
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const getRiskBadgeColor = (risk: number) => {
+  const getRiskBadgeColor = (risk: number | null) => {
+    if (risk === null) return 'bg-surface-container text-slate-gray border-surface-dim';
     if (risk >= 80) return 'bg-error-container text-error border-error/30';
     if (risk >= 50) return 'bg-amber-100 text-amber-800 border-amber-300';
     return 'bg-emerald-100 text-emerald-800 border-emerald-300';
@@ -53,7 +55,12 @@ export const NodeDetailDrawer: React.FC = () => {
               {selectedNode.label}
             </h3>
             <span className="font-outfit text-xs text-slate-gray font-medium">
-              Hop {selectedNode.hopDistance} • {selectedNode.type} Node
+              Hop {selectedNode.hopDistance} •{' '}
+              {selectedNode.isMainPath
+                ? 'Main Flow Path'
+                : selectedNode.type === 'VASP'
+                ? 'VASP Gateway'
+                : 'Secondary / Connected Node'}
             </span>
           </div>
         </div>
@@ -72,7 +79,14 @@ export const NodeDetailDrawer: React.FC = () => {
         <div className="p-4 rounded-2xl bg-pure-white border border-surface-dim space-y-2">
           <div className="flex items-center justify-between text-xs font-outfit text-slate-gray">
             <span>On-Chain Address:</span>
-            <span className="font-mono text-ink-black font-semibold">BTC Mainnet</span>
+            <div className="flex items-center gap-1.5">
+              {selectedNode.isMainPath && (
+                <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 border border-amber-300 text-[10px] font-bold uppercase tracking-wider">
+                  Main Flow
+                </span>
+              )}
+              <span className="font-mono text-ink-black font-semibold">BTC Mainnet</span>
+            </div>
           </div>
 
           <div className="flex items-center justify-between bg-surface-container p-2.5 rounded-xl font-mono text-xs text-ink-black break-all">
@@ -94,33 +108,66 @@ export const NodeDetailDrawer: React.FC = () => {
 
         {/* Risk & Entity Classification */}
         <div className="grid grid-cols-2 gap-3">
+          {/* Card 1: Genuine Node-Level Risk Score */}
           <div className="p-4 rounded-2xl bg-pure-white border border-surface-dim flex flex-col justify-between">
-            <span className="font-outfit text-xs text-slate-gray font-medium">Risk Score</span>
+            <span className="font-outfit text-xs text-slate-gray font-medium">Node Risk Score</span>
             <div className="mt-2 flex items-baseline gap-1">
-              <span className="font-outfit font-bold text-2xl text-ink-black">{selectedNode.riskScore}</span>
-              <span className="text-xs text-slate-gray">/100</span>
+              <span className="font-outfit font-bold text-2xl text-ink-black">
+                {selectedNode.riskScore === null ? 'N/A' : selectedNode.riskScore}
+              </span>
+              {selectedNode.riskScore !== null && <span className="text-xs text-slate-gray">/100</span>}
             </div>
             <span
               className={`mt-2 inline-block px-2.5 py-0.5 rounded-full text-[10px] font-outfit font-bold tracking-wider uppercase border text-center ${getRiskBadgeColor(
                 selectedNode.riskScore
               )}`}
             >
-              {selectedNode.riskScore >= 80 ? 'CRITICAL RISK' : selectedNode.riskScore >= 50 ? 'MEDIUM RISK' : 'LOW RISK'}
+              {selectedNode.riskScore === null
+                ? 'UNSCORED'
+                : selectedNode.riskScore >= 80
+                ? 'CRITICAL RISK'
+                : selectedNode.riskScore >= 50
+                ? 'MEDIUM RISK'
+                : 'LOW RISK'}
+            </span>
+            <span className="mt-1.5 text-[10px] font-outfit text-slate-gray leading-tight">
+              {selectedNode.riskScore === null
+                ? 'No node-level risk score provided'
+                : 'Direct on-chain risk rating'}
             </span>
           </div>
 
+          {/* Card 2: VASP Attribution Confidence & Flow Role */}
           <div className="p-4 rounded-2xl bg-pure-white border border-surface-dim flex flex-col justify-between">
-            <span className="font-outfit text-xs text-slate-gray font-medium">Attribution Match</span>
+            <span className="font-outfit text-xs text-slate-gray font-medium">
+              {selectedNode.candidateConfidence != null
+                ? 'VASP Attribution'
+                : selectedNode.isMainPath
+                ? 'Transaction Path'
+                : 'Attribution Match'}
+            </span>
             <div className="mt-2 flex flex-col">
               <span className="font-outfit font-bold text-base text-ink-black truncate">
-                {selectedNode.entityName || (selectedNode.type === 'VASP' ? activeCase.candidateVasp : 'Unhosted')}
+                {selectedNode.entityName || (selectedNode.type === 'VASP' ? activeCase.candidateVasp : selectedNode.isMainPath ? 'Main Path Relay' : 'Connected Address')}
               </span>
               <span className="font-outfit text-xs text-signal-orange font-bold">
-                {selectedNode.isCandidateTarget ? `${activeCase.confidenceScore}% Confidence` : 'Relay Node'}
+                {selectedNode.candidateConfidence != null
+                  ? `${selectedNode.candidateConfidence}% Confidence`
+                  : selectedNode.isCandidateTarget
+                  ? `${activeCase.confidenceScore}% Confidence`
+                  : selectedNode.isMainPath
+                  ? 'Main Traced Flow'
+                  : 'Side Transaction'}
               </span>
             </div>
-            <span className="mt-2 text-[10px] font-outfit text-slate-gray">
-              {selectedNode.type === 'VASP' ? 'Verified Exchange Gateway' : 'Peeling Chain Relay'}
+            <span className="mt-1.5 text-[10px] font-outfit text-slate-gray leading-tight">
+              {selectedNode.candidateConfidence != null
+                ? 'Heuristic VASP Deposit Candidate'
+                : selectedNode.type === 'VASP'
+                ? 'Verified Exchange Gateway'
+                : selectedNode.isMainPath
+                ? 'Active Fund Flow Path'
+                : 'Peripheral Fan-Out'}
             </span>
           </div>
         </div>
@@ -159,13 +206,13 @@ export const NodeDetailDrawer: React.FC = () => {
 
         {/* Action Triggers */}
         <div className="space-y-2 pt-2">
-          <button
-            onClick={() => alert(`Subpoena Freeze Request generated for ${selectedNode.address}`)}
-            className="w-full py-3 rounded-full bg-ink-black text-pure-white font-outfit font-bold text-xs hover:bg-signal-orange transition-colors flex items-center justify-center gap-2 shadow-md"
+          <Link
+            href={`/freeze?address=${encodeURIComponent(selectedNode.address)}`}
+            className="w-full py-3 rounded-full bg-ink-black text-pure-white font-outfit font-bold text-xs hover:bg-signal-orange hover:text-ink-black transition-colors flex items-center justify-center gap-2 shadow-md"
           >
             <FileCheck className="w-4 h-4" />
             <span>Draft Freeze Request for Node</span>
-          </button>
+          </Link>
 
           <a
             href={`https://mempool.space/address/${selectedNode.address}`}

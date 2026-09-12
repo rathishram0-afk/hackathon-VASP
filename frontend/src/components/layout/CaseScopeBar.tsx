@@ -1,8 +1,9 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useMemo } from 'react';
 import Link from 'next/link';
 import { useInvestigation } from '@/hooks/useInvestigation';
+import { InvestigatorCopilot } from '@/components/copilot/InvestigatorCopilot';
 import {
   Folder,
   Layers,
@@ -15,11 +16,52 @@ import {
   AlertTriangle,
   Bell,
   Coins,
-  Network
+  Network,
+  Sparkles
 } from 'lucide-react';
 
 export const CaseScopeBar: React.FC = () => {
-  const { activeCase, casesList, selectCase, attributions, mixerPatterns } = useInvestigation();
+  const { activeCase, casesList, selectCase, attributions, mixerPatterns, graphData, selectNode } = useInvestigation();
+  const [isCopilotOpen, setIsCopilotOpen] = useState(false);
+
+  const traceContext = useMemo(() => {
+    return {
+      source: activeCase.sourceWallet,
+      truncated: false,
+      graph: {
+        nodes: (graphData.nodes || []).map((n) => ({
+          address: n.id,
+          hop_distance: n.hopDistance || 0,
+          tag: n.entityName ? { exchange: n.entityName, label: n.label || '' } : null,
+        })),
+        edges: (graphData.edges || []).map((e) => ({
+          src: typeof e.source === 'object' ? (e.source as any).id : e.source,
+          dst: typeof e.target === 'object' ? (e.target as any).id : e.target,
+          tx_hash: e.txHash || null,
+          value_btc: e.amountBtc || null,
+          timestamp: e.timestamp ? Math.floor(new Date(e.timestamp).getTime() / 1000) : null,
+        })),
+      },
+      candidates: (attributions || []).map((a) => ({
+        exchange: a.name,
+        address: a.depositAddress,
+        confidence: a.confidenceScore > 1 ? a.confidenceScore / 100 : a.confidenceScore,
+        hop_distance: a.hopDistance,
+        path: [activeCase.sourceWallet, a.depositAddress],
+        kind: a.entityType === 'EXCHANGE' ? 'direct_hit' : 'heuristic',
+        mixer_obscured: false,
+      })),
+    };
+  }, [activeCase, graphData, attributions]);
+
+
+  const handleSelectNode = (address: string) => {
+    const found = graphData.nodes?.find((n) => n.id === address || n.label === address);
+    if (found) {
+      selectNode(found);
+    }
+  };
+
 
   return (
     <div className="lg:pl-64 pt-16 w-full bg-canvas-cream">
@@ -64,8 +106,16 @@ export const CaseScopeBar: React.FC = () => {
             </div>
           </div>
 
-          {/* Action Buttons Cluster (Matching Image) */}
+          {/* Action Buttons Cluster (Matching Image + AI Copilot) */}
           <div className="flex flex-wrap items-center gap-2.5 shrink-0">
+            <button
+              onClick={() => setIsCopilotOpen(true)}
+              className="px-4 py-2 rounded-xl bg-gradient-to-r from-cyan-700 to-emerald-600 hover:from-cyan-600 hover:to-emerald-500 text-pure-white font-outfit font-bold text-xs flex items-center gap-1.5 transition-all shadow-md shadow-cyan-900/20 cursor-pointer"
+            >
+              <Sparkles className="w-3.5 h-3.5 text-emerald-200 animate-pulse" />
+              <span>AI Copilot</span>
+            </button>
+
             <Link
               href="/trace"
               className="px-4 py-2 rounded-xl bg-ink-black hover:bg-ink-black/80 text-pure-white font-outfit font-bold text-xs flex items-center gap-1.5 transition-colors shadow-xs"
@@ -90,6 +140,7 @@ export const CaseScopeBar: React.FC = () => {
               <span>Share Dossier</span>
             </Link>
           </div>
+
         </div>
 
         {/* Metric Cards Ribbon (Matching the 8 Cards in the Image) */}
@@ -183,6 +234,15 @@ export const CaseScopeBar: React.FC = () => {
           </div>
         </div>
       </div>
+
+      <InvestigatorCopilot
+        isOpen={isCopilotOpen}
+        onClose={() => setIsCopilotOpen(false)}
+        investigationId={activeCase.id}
+        traceContext={traceContext}
+        onSelectNode={handleSelectNode}
+      />
     </div>
   );
 };
+

@@ -14,7 +14,7 @@ from Backend.app import investigations_db as db
 from Backend.app.auth import AuthenticatedUser, get_current_user
 from Backend.app.risk import classify_trace_result
 from Backend.app.traversal import DEFAULT_MAX_HOPS, DEFAULT_MAX_NODES
-from Blockchain.client.onchain import OnChainClientError
+from Blockchain.hops import ProviderUnavailableError
 from Integeration.pipeline import run_trace
 
 router = APIRouter()
@@ -84,7 +84,7 @@ def trace_investigation(
             max_hops=investigation.get("max_hops", DEFAULT_MAX_HOPS),
             max_nodes=investigation.get("max_nodes", DEFAULT_MAX_NODES),
         )
-    except OnChainClientError as exc:
+    except ProviderUnavailableError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
 
     db.save_trace_result(str(investigation_id), trace_result)

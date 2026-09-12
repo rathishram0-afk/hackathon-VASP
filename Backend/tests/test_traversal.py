@@ -1,7 +1,9 @@
 from unittest.mock import patch
 
+import pytest
+
 from Backend.app import traversal
-from Blockchain.hops import Hop
+from Blockchain.hops import Hop, ProviderUnavailableError
 from Blockchain.models import Edge
 from Blockchain.tag_list import ExchangeTag
 
@@ -85,13 +87,41 @@ def test_traversal_respects_max_nodes_and_flags_truncated():
     assert len(result.graph.nodes) <= 4
 
 
-def test_traversal_handles_client_errors_as_dead_end():
+def test_traversal_raises_when_source_provider_unavailable():
+    # If we never got any real data for the trace's own source address, the
+    # graph would otherwise look like a legitimate (empty) result -- that
+    # must surface as a real failure instead.
     def raising_get_next_hops(address: str, limit: int = 50):
-        raise RuntimeError("simulated API failure")
+        raise ProviderUnavailableError("both providers down")
 
     with patch.object(traversal, "get_next_hops", raising_get_next_hops):
+        with pytest.raises(ProviderUnavailableError, match="both providers down"):
+            traversal.traverse(SOURCE, max_hops=3, max_nodes=10)
+
+
+def test_traversal_treats_non_source_provider_failure_as_dead_end():
+    # A deeper node's lookup failing after real data was already gathered
+    # elsewhere must not discard the rest of the (still useful) trace.
+    def flaky_get_next_hops(address: str, limit: int = 50):
+        if address == SOURCE:
+            return [Hop(edge=_edge(SOURCE, "A"), dst_tag=None)]
+        raise ProviderUnavailableError("rate limited")
+
+    with patch.object(traversal, "get_next_hops", flaky_get_next_hops):
         result = traversal.traverse(SOURCE, max_hops=3, max_nodes=10)
 
-    assert result.graph.nodes[SOURCE]["hop_distance"] == 0
-    assert SOURCE in result.frontier_untagged
+    assert set(result.graph.nodes) == {SOURCE, "A"}
+    assert "A" in result.frontier_untagged
     assert result.direct_hits == []
+
+
+def test_traversal_propagates_unexpected_errors():
+    # A bug (anything other than a known provider failure) must not be
+    # silently swallowed into a fake dead end -- it should surface as a real
+    # unhandled error (-> HTTP 500 at the API layer).
+    def buggy_get_next_hops(address: str, limit: int = 50):
+        raise ValueError("unexpected bug")
+
+    with patch.object(traversal, "get_next_hops", buggy_get_next_hops):
+        with pytest.raises(ValueError, match="unexpected bug"):
+            traversal.traverse(SOURCE, max_hops=3, max_nodes=10)
